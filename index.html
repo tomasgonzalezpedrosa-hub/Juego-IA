@@ -1,0 +1,1398 @@
+<title>La Burbuja de la IA</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Concepto: un tablero de control con dos líneas en tensión (hype vs valor real).
+   La brecha entre ambas es el riesgo de burbuja y se ve en el gráfico. */
+:root {
+  --bg: #F2F4F6;
+  --surface: #FFFFFF;
+  --surface2: #E8ECF0;
+  --fg: #12181F;
+  --muted: #5B6773;
+  --line: #D3DAE1;
+  --hype: #D9480F;
+  --real: #0B7A6B;
+  --danger: #C2255C;
+  --accent: #2B4ACB;
+  --on-fg: #FFFFFF;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1117; --surface: #151B23; --surface2: #1D2531; --fg: #E7ECF1; --muted: #93A0AD;
+    --line: #28323E; --hype: #FF8A4C; --real: #3CC8B0; --danger: #FF6B9A; --accent: #7AA2FF; --on-fg: #0D1117;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1117; --surface: #151B23; --surface2: #1D2531; --fg: #E7ECF1; --muted: #93A0AD;
+  --line: #28323E; --hype: #FF8A4C; --real: #3CC8B0; --danger: #FF6B9A; --accent: #7AA2FF; --on-fg: #0D1117;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 40px;
+}
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+p { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1120px; margin: 0 auto; }
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+.btn {
+  background: var(--fg); color: var(--on-fg); border: 0; border-radius: 8px;
+  padding: 11px 20px; font-weight: 600;
+}
+.btn:hover { opacity: 0.88; }
+.btn:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; opacity: 1; }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.btn.ghost:disabled { background: transparent; }
+.btn.small { padding: 7px 12px; font-size: 13px; font-weight: 500; }
+.btn.wide { width: 100%; padding: 13px 20px; }
+
+/* ---------- Intro ---------- */
+.intro { max-width: 680px; margin: 6vh auto 0; display: grid; gap: 22px; }
+.intro h1 { font-size: clamp(34px, 7vw, 56px); line-height: 1.02; }
+.intro .lead { font-size: 17px; color: var(--muted); max-width: 56ch; }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.rule { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+.rule b { display: block; font-family: var(--font-display); margin-bottom: 4px; }
+.rule.win b { color: var(--real); }
+.rule.lose b { color: var(--danger); }
+.rule span { color: var(--muted); font-size: 14px; }
+.start { display: flex; gap: 10px; flex-wrap: wrap; }
+.start label { width: 100%; font-size: 13px; color: var(--muted); }
+.start input {
+  flex: 1 1 220px; min-width: 0; padding: 11px 14px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit;
+}
+
+/* ---------- Juego ---------- */
+.top { display: flex; justify-content: space-between; align-items: end; gap: 16px 32px; flex-wrap: wrap; margin-bottom: 18px; }
+.top h1 { font-size: clamp(24px, 4vw, 34px); }
+.top-r { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; flex: 0 1 460px; justify-content: flex-end; }
+.clock { min-width: 200px; flex: 1 1 240px; display: grid; gap: 6px; }
+.clock .row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); gap: 8px; }
+.track { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.track > i { display: block; height: 100%; background: var(--fg); width: 0; }
+
+.market { margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+.market .none { color: var(--muted); font-size: 13.5px; padding: 10px 0; }
+.chip { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 13px; display: grid; gap: 1px; min-width: 0; max-width: 100%; }
+.chip b { font-family: var(--font-display); font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.chip b::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex: none; }
+.chip.good b::before { background: var(--real); }
+.chip span { font-size: 12.5px; color: var(--muted); }
+
+.dash { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; margin-bottom: 16px; }
+.play { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 16px; }
+@media (max-width: 860px) { .dash, .play { grid-template-columns: minmax(0, 1fr); } }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
+.card h2 { font-size: 15px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+
+.stats { display: grid; gap: 0; }
+.stat { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.stat:first-child { padding-top: 0; }
+.stat .k { color: var(--muted); font-size: 13px; }
+.stat .v { font-size: 22px; font-weight: 500; }
+.stat .sub { width: 100%; font-size: 12.5px; color: var(--muted); }
+.stat .sub.warn { color: var(--danger); }
+.meters { display: grid; gap: 14px; padding-top: 16px; }
+.mrow { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+.mrow .k { color: var(--muted); }
+.mtrack { height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+.mtrack > i { display: block; height: 100%; width: 0; border-radius: 5px; }
+@media (prefers-reduced-motion: no-preference) { .mtrack > i, .track > i { transition: width .5s ease; } }
+.fHype { background: var(--hype); }
+.fReal { background: var(--real); }
+
+.chart-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; margin-bottom: 8px; }
+.chart-head h2 { margin: 0; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 0; border-top: 3px solid; display: inline-block; }
+.sw.h { border-color: var(--hype); } .sw.r { border-color: var(--real); }
+.sw.m { border-top: 2px dashed var(--muted); }
+.sw.g { height: 10px; width: 14px; border: 0; background: var(--danger); opacity: .28; border-radius: 2px; }
+.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .ax { fill: var(--muted); font-family: var(--font-data); font-size: 11px; }
+.chart .lh { stroke: var(--hype); } .chart .lr { stroke: var(--real); }
+.chart .lh, .chart .lr { fill: none; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+.chart .dh { fill: var(--hype); } .chart .dr { fill: var(--real); }
+.chart .gb { fill: var(--danger); fill-opacity: .22; }
+.chart .gg { fill: var(--real); fill-opacity: .16; }
+.chart .mk { stroke: var(--muted); stroke-dasharray: 3 3; stroke-width: 1; }
+.gap-note { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
+.gap-note.warn { color: var(--danger); font-weight: 500; }
+
+.col { display: grid; gap: 16px; min-width: 0; align-content: start; }
+.sw.k { border-top: 2px dashed var(--accent); }
+.chart .lm { fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-dasharray: 5 4; stroke-linejoin: round; }
+
+/* La burbuja del mercado: crece con el índice, tiembla más cuando está por pincharse */
+.bub { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: center; }
+@media (max-width: 480px) { .bub { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; } }
+.bub svg { width: 150px; max-width: 100%; height: auto; display: block; overflow: visible; }
+.bub .ring { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.bub .body { stroke-width: 2.5; fill-opacity: .2; }
+.bub .shine { fill: none; stroke: var(--fg); stroke-width: 3; stroke-linecap: round; opacity: .35; }
+.bub .crack { fill: none; stroke: var(--danger); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.bub .idx { font-family: var(--font-data); font-size: 24px; font-weight: 500; fill: var(--fg); text-anchor: middle; }
+.bub .lab { font-family: var(--font-body); font-size: 8.5px; fill: var(--muted); text-anchor: middle; letter-spacing: .1em; text-transform: uppercase; }
+.bub .ph0 .body, .bub svg.ph0 .body { stroke: var(--real); fill: var(--real); }
+.bub svg.ph1 .body { stroke: var(--accent); fill: var(--accent); }
+.bub svg.ph2 .body { stroke: var(--hype); fill: var(--hype); }
+.bub svg.ph3 .body { stroke: var(--danger); fill: var(--danger); }
+.bub svg.phW .body { stroke: var(--muted); fill: var(--muted); stroke-dasharray: 4 4; }
+.bub .phase { font-family: var(--font-display); font-size: 21px; font-weight: 700; line-height: 1.15; margin: 2px 0 6px; }
+.bub .adv { font-size: 13.5px; color: var(--muted); }
+.bub .prob { margin-top: 8px; font-size: 13px; font-weight: 500; }
+.bub .prob.warn { color: var(--danger); }
+@keyframes wob { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+@media (prefers-reduced-motion: no-preference) {
+  .bub .body-g { transform-box: fill-box; transform-origin: center; animation: wob var(--wob, 3s) ease-in-out infinite; }
+  .bub .body { transition: r .6s ease; }
+}
+
+.pips { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.pip { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--fg); display: inline-block; }
+.pip.on { background: var(--fg); }
+.pips em { font-style: normal; margin-left: 4px; }
+
+.acts { display: grid; gap: 10px; }
+.act { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.act:first-child { padding-top: 0; }
+.act h3 { font-size: 15px; }
+.act .d { font-size: 13px; color: var(--muted); }
+.act .meta { font-size: 12px; font-family: var(--font-data); color: var(--muted); margin-top: 3px; }
+.act .meta.no { color: var(--danger); }
+.act-ctl { display: flex; gap: 8px; align-items: center; }
+.act .btn { min-width: 108px; padding: 9px 14px; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.stepper button { background: var(--surface2); border: 0; width: 30px; height: 34px; font-size: 16px; }
+.stepper output { width: 30px; text-align: center; font-family: var(--font-data); }
+@media (max-width: 480px) { .act { grid-template-columns: minmax(0, 1fr); } }
+.closer { padding-top: 14px; display: grid; gap: 6px; }
+.close-hint { font-size: 12.5px; color: var(--muted); text-align: center; }
+.note { min-height: 20px; margin-top: 8px; font-size: 13.5px; color: var(--danger); }
+
+.log { list-style: none; margin: 0; padding: 0; max-height: 460px; overflow-y: auto; display: grid; gap: 0; }
+.log li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.log li:last-child { border-bottom: 0; }
+.log .m { font-family: var(--font-data); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.log .t.good { color: var(--real); }
+.log .t.bad { color: var(--danger); }
+.log .t.event { font-weight: 500; }
+.log .t.info { color: var(--muted); }
+
+/* ---------- Capas (tutorial, cierre de mes, final) ---------- */
+.ov { position: fixed; inset: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 90%, transparent); overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+#cierre { z-index: 24; }
+#tuto { z-index: 28; }
+.ov-card { max-width: 600px; margin: 4vh auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: grid; gap: 16px; }
+.ov-card h2 { font-size: 28px; }
+.ov-card.win h2 { color: var(--real); }
+.ov-card.lose h2 { color: var(--danger); }
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+.btnrow .grp { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Tutorial */
+.tbody { display: grid; gap: 12px; color: var(--fg); min-height: 210px; align-content: start; }
+.tbody p { color: var(--muted); }
+.tbody ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.tbody li { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; font-size: 14px; color: var(--muted); }
+.tbody li b { color: var(--fg); font-family: var(--font-display); font-weight: 500; }
+.tbody .demo { background: var(--bg); border-radius: 8px; padding: 14px; display: grid; gap: 12px; }
+.tbody .demo .mrow .k { color: var(--muted); }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: block; }
+.dots i.on { background: var(--fg); }
+
+/* Cierre de mes */
+.progress { display: grid; gap: 6px; }
+.progress p { font-size: 13px; color: var(--muted); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.step { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: start; opacity: 0; transform: translateY(6px); }
+.step.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: no-preference) { .step { transition: opacity .35s ease, transform .35s ease; } }
+@media (prefers-reduced-motion: reduce) { .step { opacity: 1; transform: none; } }
+.step:last-child { border-bottom: 0; }
+.step .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); margin-top: 6px; }
+.step.good .dot { background: var(--real); }
+.step.bad .dot { background: var(--danger); }
+.step.event .dot { background: var(--hype); }
+.step b { font-family: var(--font-display); font-weight: 500; display: block; }
+.step p { font-size: 13.5px; color: var(--muted); }
+.step .val { font-size: 13px; padding-top: 2px; white-space: nowrap; }
+.decision { border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; background: var(--bg); }
+.decision h3 { font-size: 17px; }
+.decision p { color: var(--muted); font-size: 14px; }
+.opts { display: grid; gap: 8px; }
+.opt { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 11px 14px; display: grid; gap: 2px; }
+.opt b { font-family: var(--font-display); font-weight: 500; }
+.opt span { font-size: 13px; color: var(--muted); }
+.opt:hover:not(:disabled) { border-color: var(--fg); }
+.opt:disabled { cursor: not-allowed; opacity: .55; }
+.opt.chosen { border-color: var(--fg); opacity: 1; }
+.decision .result { font-size: 13.5px; font-weight: 500; }
+
+/* Final */
+.fgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fgrid div { background: var(--bg); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.fgrid span { display: block; font-size: 12px; color: var(--muted); }
+.fgrid b { font-family: var(--font-data); font-weight: 500; font-size: 16px; }
+.lesson { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+
+<div class="wrap">
+
+  <!-- Intro -->
+  <section class="intro" id="intro">
+    <div>
+      <p class="eyebrow">Simulador de startups</p>
+      <h1>La Burbuja de la IA</h1>
+    </div>
+    <p class="lead">Eres fundador de una startup de IA en pleno boom. Las valoraciones se disparan y todos hablan de AGI. Tu trabajo es separar lo que es hype de lo que es producto real, y sobrevivir 36 meses a crisis, regulaciones y una burbuja de mercado que puede pincharse cualquier mes.</p>
+    <div class="rules">
+      <div class="rule win"><b>Ganas si</b><span>Lanzas un producto real y te adquieren, o llegas al mes 36 siendo rentable.</span></div>
+      <div class="rule lose"><b>Pierdes si</b><span>Te quedas sin caja, o aguantas 3 años sin un negocio sólido.</span></div>
+    </div>
+    <form class="start" id="startForm">
+      <label for="nameInput">Nombre de tu startup</label>
+      <input id="nameInput" type="text" maxlength="30" placeholder="NeuroFlux AI" autocomplete="off">
+      <button class="btn" type="submit">Fundar startup</button>
+    </form>
+  </section>
+
+  <!-- Juego -->
+  <main id="game" hidden>
+    <header class="top">
+      <div>
+        <p class="eyebrow">Startup de IA</p>
+        <h1 id="gName"></h1>
+      </div>
+      <div class="top-r">
+        <div class="clock">
+          <div class="row"><span id="mesTxt"></span><span id="rondaTxt"></span></div>
+          <div class="track"><i id="mesBar"></i></div>
+        </div>
+        <button class="btn ghost small" id="helpBtn" type="button">Cómo jugar</button>
+      </div>
+    </header>
+
+    <section class="market" id="market" aria-label="Condiciones del mercado"></section>
+
+    <div class="dash">
+      <section class="card" aria-label="Estado de la startup">
+        <div class="stats">
+          <div class="stat"><span class="k">Efectivo</span><span class="v num" id="vCash"></span><span class="sub" id="sCash"></span></div>
+          <div class="stat"><span class="k">Valoración</span><span class="v num" id="vVal"></span><span class="sub" id="sVal"></span></div>
+          <div class="stat"><span class="k">Equipo</span><span class="v num" id="vEmp"></span><span class="sub" id="sEmp"></span></div>
+        </div>
+        <div class="meters">
+          <div><div class="mrow"><span class="k">Hype</span><b class="num" id="vHype"></b></div><div class="mtrack"><i class="fHype" id="fHype"></i></div></div>
+          <div><div class="mrow"><span class="k">Valor real</span><b class="num" id="vReal"></b></div><div class="mtrack"><i class="fReal" id="fReal"></i></div></div>
+          <div><div class="mrow"><span class="k">Riesgo de burbuja</span><b class="num" id="vRisk"></b></div><div class="mtrack"><i id="fRisk"></i></div></div>
+        </div>
+      </section>
+
+      <div class="col">
+      <section class="card" aria-label="Burbuja del mercado">
+        <div class="card-head"><h2>Burbuja del mercado de IA</h2></div>
+        <div class="bub">
+          <svg viewBox="0 0 150 150" id="bubSvg" class="ph1" role="img" aria-label="Burbuja que representa el índice del mercado de IA">
+            <circle class="ring" cx="75" cy="75" r="72"/>
+            <g class="body-g">
+              <circle class="body" id="bubBody" cx="75" cy="75" r="30"/>
+              <path class="shine" id="bubShine" d=""/>
+            </g>
+            <g id="bubCracks" hidden>
+              <path class="crack" d="M96 58 L103 67 L120 46"/>
+              <path class="crack" d="M56 98 L64 104 L52 122"/>
+              <path class="crack" d="M54 62 L46 70 L34 64"/>
+            </g>
+            <text class="idx" x="75" y="79" id="bubNum"></text>
+            <text class="lab" x="75" y="94">índice</text>
+          </svg>
+          <div>
+            <p class="eyebrow">Fase del mercado</p>
+            <p class="phase" id="bubFase"></p>
+            <p class="adv" id="bubAdv"></p>
+            <p class="prob" id="bubProb"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Hype contra valor real">
+        <div class="chart-head">
+          <h2>Hype contra valor real</h2>
+          <div class="legend">
+            <span><i class="sw h"></i>Hype</span>
+            <span><i class="sw r"></i>Valor real</span>
+            <span><i class="sw g"></i>Brecha</span>
+            <span><i class="sw k"></i>Mercado IA</span>
+            <span><i class="sw m"></i>Pinchazo</span>
+          </div>
+        </div>
+        <svg class="chart" id="chart" viewBox="0 0 640 250" role="img" aria-label="Evolución mensual del hype y del valor real"></svg>
+        <p class="gap-note" id="gapNote"></p>
+      </section>
+      </div>
+    </div>
+
+    <div class="play">
+      <section class="card" aria-label="Acciones">
+        <div class="card-head">
+          <h2>Acciones de este mes</h2>
+          <span class="pips" id="pips"></span>
+        </div>
+        <div class="acts" id="acts"></div>
+        <p class="note" id="note" aria-live="polite"></p>
+        <div class="closer">
+          <button class="btn wide" id="closeBtn" type="button">Cerrar mes</button>
+          <p class="close-hint" id="closeHint"></p>
+        </div>
+      </section>
+      <section class="card" aria-label="Registro">
+        <div class="card-head"><h2>Registro</h2></div>
+        <ul class="log" id="log" aria-live="polite"></ul>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Tutorial -->
+<div class="ov" id="tuto" hidden>
+  <div class="ov-card" role="dialog" aria-modal="true" aria-labelledby="tTitle">
+    <p class="eyebrow" id="tKick"></p>
+    <h2 id="tTitle"></h2>
+    <div class="tbody" id="tBody"></div>
+    <div class="btnrow">
+      <div class="dots" id="tDots" aria-hidden="true"></div>
+      <div class="grp">
+        <button class="btn ghost" id="tSkip" type="button">Saltar</button>
+        <button class="btn ghost" id="tBack" type="button">Atrás</button>
+        <button class="btn" id="tNext" type="button">Siguiente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cierre de mes -->
+<div class="ov" id="cierre" hidden>
+  <div class="ov-card" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+    <div>
+      <p class="eyebrow">Procesando el mes</p>
+      <h2 id="cTitle"></h2>
+    </div>
+    <div class="progress">
+      <div class="track"><i id="cBar"></i></div>
+      <p id="cSub">Esto es lo que pasó después de tus acciones.</p>
+    </div>
+    <ol class="steps" id="cList"></ol>
+    <div class="decision" id="cDecision" hidden></div>
+    <div class="btnrow">
+      <button class="btn ghost" id="cSkip" type="button">Saltar animación</button>
+      <button class="btn" id="cNext" type="button" disabled>Procesando…</button>
+    </div>
+  </div>
+</div>
+
+<!-- Final -->
+<div class="ov" id="final" hidden>
+  <div class="ov-card" id="finalCard" role="dialog" aria-modal="true" aria-labelledby="fTitle">
+    <p class="eyebrow" id="fKicker"></p>
+    <h2 id="fTitle"></h2>
+    <p id="fMotivo"></p>
+    <div class="fgrid" id="fGrid"></div>
+    <p class="lesson" id="fLesson"></p>
+    <div class="start" style="gap:10px">
+      <button class="btn" id="again" type="button">Jugar de nuevo</button>
+      <button class="btn ghost" id="closeFinal" type="button">Ver el tablero</button>
+    </div>
+  </div>
+</div>
+
+<!-- Motor del juego: sin DOM, para poder probarlo aparte -->
+<script>
+const Motor = (function () {
+  "use strict";
+
+  const CFG = {
+    EFECTIVO: 500000, VALORACION: 2000000, EMPLEADOS: 3,
+    SALARIO: 14000, ONBOARDING: 18000, INGRESO_PUNTO: 2000,
+    MESES: 36, ENFRIAMIENTO: 4, MIN_LANZAR: 45, ADQUISICION: 80, UMBRAL: 70,
+    ACCIONES_MES: 3, COBERTURA: 120000
+  };
+
+  // Condiciones de mercado que duran varios meses
+  const EFECTOS = {
+    ram:        { nombre: "Crisis de RAM", desc: "El I+D cuesta +60%", tipo: "bad", costoID: 1.6 },
+    recesion:   { nombre: "Recesión global", desc: "Sin rondas, ingresos −20%, hype −3 por mes", tipo: "bad", bloqueaRonda: true, ingresos: 0.8, hypeMes: -3 },
+    fomo:       { nombre: "Fiebre inversora", desc: "Las rondas traen +50% de dinero", tipo: "good", ronda: 1.5 },
+    energia:    { nombre: "Alza de energía", desc: "Gastos operativos +15%", tipo: "bad", gastos: 1.15 },
+    regulacion: { nombre: "Nueva regulación de IA", desc: "El I+D cuesta +20% y el hype −2 por mes", tipo: "bad", costoID: 1.2, hypeMes: -2 },
+    precios:    { nombre: "Guerra de precios", desc: "Ingresos −25%", tipo: "bad", ingresos: 0.75 },
+    tasas:      { nombre: "Tasas de interés altas", desc: "Las rondas traen 20% menos de dinero", tipo: "bad", ronda: 0.8 },
+    boom:       { nombre: "Boom de clientes", desc: "Ingresos +30%", tipo: "good", ingresos: 1.3 },
+    pinchazo:   { nombre: "Invierno de la IA", desc: "Sin rondas, valoraciones hundidas, ingresos −10%, hype −2 por mes", tipo: "bad", bloqueaRonda: true, ingresos: 0.9, hypeMes: -2 },
+    cobertura:  { nombre: "Cobertura anticrisis", desc: "Amortigua el golpe si la burbuja se pincha", tipo: "good" }
+  };
+
+  const fmt = new Intl.NumberFormat("es-CO");
+  const money = (n) => (n < 0 ? "-" : "") + "$" + fmt.format(Math.abs(Math.round(n)));
+  const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+  const rf = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v) => Math.max(0, Math.min(100, v));
+  function pesado(lista) {
+    const total = lista.reduce((s, x) => s + (x.w || 1), 0);
+    let r = Math.random() * total;
+    for (const x of lista) { r -= (x.w || 1); if (r <= 0) return x; }
+    return lista[lista.length - 1];
+  }
+
+  // ---------- Estado ----------
+  const S = {};
+  function nuevo(nombre) {
+    return {
+      nombre, efectivo: CFG.EFECTIVO, valoracion: CFG.VALORACION, valMax: CFG.VALORACION,
+      hype: 15, real: 10, mes: 1, emp: CFG.EMPLEADOS, prop: 1, lanzado: false,
+      desde: CFG.ENFRIAMIENTO, corr: 0, crisis: 0, ap: CFG.ACCIONES_MES, contratarN: 1,
+      idx: 35, pinchazos: 0, secDesde: 4,
+      fin: false, victoria: false, vendida: false, ventaValor: 0, motivo: "",
+      hist: [], marks: [], log: [], efectos: [], reporte: [], decision: null, mesCerrado: 0
+    };
+  }
+  function reiniciar(nombre) {
+    Object.keys(S).forEach((k) => delete S[k]);
+    Object.assign(S, nuevo(nombre));
+    say(`${nombre} fue fundada con ${money(S.efectivo)} de capital semilla y ${S.emp} empleados.`, "info");
+    iniciarMes();
+  }
+  const say = (texto, kind) => S.log.push({ mes: Math.min(S.mes, CFG.MESES), text: texto, kind: kind || "info" });
+
+  // ---------- Efectos y métricas ----------
+  const activo = (id) => S.efectos.some((e) => e.id === id);
+  const mult = (k) => S.efectos.reduce((m, e) => m * (EFECTOS[e.id][k] !== undefined ? EFECTOS[e.id][k] : 1), 1);
+  const suma = (k) => S.efectos.reduce((m, e) => m + (EFECTOS[e.id][k] || 0), 0);
+  function iniciarEfecto(id, meses) {
+    const e = S.efectos.find((x) => x.id === id);
+    if (e) e.meses = Math.max(e.meses, meses); else S.efectos.push({ id, meses });
+  }
+  const rondaBloqueada = () => S.efectos.some((e) => EFECTOS[e.id].bloqueaRonda);
+
+  const costoID = () => Math.round((180000 + S.emp * 25000) * mult("costoID"));
+  const gastos = () => Math.round(S.emp * CFG.SALARIO * mult("gastos"));
+  const ingresos = () => (S.lanzado ? Math.round(S.real * CFG.INGRESO_PUNTO * mult("ingresos")) : 0);
+  const neta = () => gastos() - ingresos();
+  const runway = () => (neta() <= 0 ? Infinity : S.efectivo / neta());
+  const riesgo = () => Math.floor(Math.max(0, Math.min(100, (S.hype - S.real) * 1.8)));
+
+  // ---------- La burbuja del mercado (índice global de 0 a 100) ----------
+  function mercadoMover(d) { S.idx = clamp(S.idx + d); }
+  function probPinchazo() {
+    if (activo("pinchazo") || S.mes < 6 || S.idx < 60) return 0;
+    return Math.min(0.5, 0.04 + (S.idx - 60) * 0.012);
+  }
+  function fase() {
+    if (activo("pinchazo")) return { clase: "W", nombre: "Invierno de la IA", consejo: "El mercado perdió la fe. Recorta gastos, vive de tus ingresos y espera a que vuelvan los inversores." };
+    if (S.idx < 25) return { clase: 0, nombre: "Despertar", consejo: "Pocos creen todavía en la IA. Buen momento para construir producto con poca competencia." };
+    if (S.idx < 50) return { clase: 1, nombre: "Boom", consejo: "El dinero empieza a fluir. Levanta ronda y lanza tu producto antes que los demás." };
+    if (S.idx < 75) return { clase: 2, nombre: "Euforia", consejo: "Las valoraciones se disparan. Aprovecha para juntar caja, pero respalda el hype con producto real." };
+    return { clase: 3, nombre: "Burbuja extrema", consejo: "Todos compran sin mirar. El pinchazo puede llegar cualquier mes: protégete con una cobertura o vende parte de tus acciones." };
+  }
+  function moverMercado() {
+    const antes = S.idx;
+    if (activo("pinchazo")) {
+      mercadoMover(rnd(1, 4));
+      return { titulo: "Termómetro del mercado IA", kind: "info", valor: `${antes} → ${S.idx}`,
+        texto: "El invierno de la IA sigue: el índice se recupera despacio y los inversores todavía no vuelven." };
+    }
+    const p = probPinchazo();
+    mercadoMover(rnd(-2, 7));
+    if (Math.random() < p) {
+      const escudo = activo("cobertura");
+      const f = Math.min(0.9, 0.45 + (S.real / 100) * 0.3 + (escudo ? 0.2 : 0));
+      const hypeAntes = S.hype, pico = S.idx;
+      S.hype = Math.floor(S.hype * f);
+      S.idx = rnd(10, 20);
+      const m = rnd(4, 6);
+      iniciarEfecto("pinchazo", m);
+      S.crisis++; S.pinchazos++;
+      S.marks.push(Math.min(S.mes + 1, CFG.MESES));
+      const texto = `¡Pinchazo de la burbuja de la IA! El índice cae de ${pico} a ${S.idx}, las rondas se congelan y las valoraciones se hunden durante ${m} meses. Tu hype baja de ${hypeAntes} a ${S.hype}.`
+        + (escudo ? " Tu cobertura anticrisis amortiguó el golpe." : S.real >= 40 ? " Tu producto real te protegió en parte." : " Sin producto real que te respalde, el golpe es duro.");
+      say(texto, "bad");
+      return { titulo: "¡Pinchazo global!", kind: "bad", valor: `${pico} → ${S.idx}`, texto };
+    }
+    let texto = `El índice de burbuja pasó de ${antes} a ${S.idx}. Fase: ${fase().nombre}.`;
+    const p2 = probPinchazo();
+    if (p2 > 0) texto += ` Probabilidad de pinchazo el próximo cierre: ${Math.round(p2 * 100)}%.`;
+    return { titulo: "Termómetro del mercado IA", kind: S.idx >= 75 ? "bad" : "info", valor: `${antes} → ${S.idx}`, texto };
+  }
+
+  function actualizarValoracion() {
+    const fh = 1 + (S.hype / 100) * 2.5;
+    const fr = 1 + (S.real / 100) * 0.8;
+    const base = 1500000 + S.emp * 180000;
+    const fm = 0.7 + (S.idx / 100) * 0.8;   // el mercado infla o hunde todas las valoraciones
+    S.valoracion = Math.floor(base * fh * fr * fm * rf(0.9, 1.15));
+    S.valMax = Math.max(S.valMax, S.valoracion);
+  }
+  function registrarHistorial() {
+    const mes = Math.min(S.mes, CFG.MESES);
+    const p = { mes, hype: S.hype, real: S.real, idx: S.idx };
+    const i = S.hist.findIndex((x) => x.mes === mes);
+    if (i >= 0) S.hist[i] = p; else S.hist.push(p);
+  }
+  function iniciarMes() { actualizarValoracion(); registrarHistorial(); }
+
+  // ---------- Acciones (hasta 3 por mes) ----------
+  const ACCIONES = [
+    {
+      id: "ronda", titulo: "Levantar ronda de inversión", verbo: "Levantar",
+      desc: "Entra efectivo y sube el hype, pero cedes parte de la empresa.",
+      meta: () => "Recibes 15–35% de tu valoración",
+      bloqueo: () => rondaBloqueada() ? "La recesión congeló las rondas" :
+        S.desde < CFG.ENFRIAMIENTO ? `Los inversores esperan avances: disponible en ${CFG.ENFRIAMIENTO - S.desde} mes(es)` : "",
+      run() {
+        const cantidad = Math.floor(S.valoracion * rf(0.15, 0.35) * mult("ronda"));
+        const dil = cantidad / (S.valoracion + cantidad);
+        S.efectivo += cantidad; S.prop *= 1 - dil;
+        S.hype = clamp(S.hype + rnd(8, 15)); S.desde = 0;
+        say(`Cerraste una ronda de ${money(cantidad)}. Dilución ${Math.round(dil * 100)}%: ahora posees el ${Math.round(S.prop * 100)}%.`, "good");
+        return true;
+      }
+    },
+    {
+      id: "id", titulo: "Invertir en producto (I+D)", verbo: "Invertir",
+      desc: "Sube el valor real. Un equipo más grande avanza más rápido.",
+      meta: () => `Costo ${money(costoID())} · Valor real +3 a +6 (más con equipo grande)`,
+      bloqueo: () => S.efectivo <= costoID() ? `Te faltan ${money(costoID() - S.efectivo + 1)}` : "",
+      run() {
+        const c = costoID();
+        S.efectivo -= c;
+        const a = rnd(3, 6) + Math.floor(S.emp / 4);
+        S.real = clamp(S.real + a);
+        say(`Invertiste ${money(c)} en I+D. Valor real +${a}.`, "good");
+        return true;
+      }
+    },
+    {
+      id: "hype", titulo: "Campaña de marketing y hype", verbo: "Lanzar campaña",
+      desc: "Sube el hype mucho. Sin producto real, aumenta el riesgo de burbuja.",
+      meta: () => "Costo $120.000–$350.000 · Hype +15 a +28",
+      bloqueo: () => S.efectivo <= 120000 ? "No te alcanza para una campaña" : "",
+      run() {
+        const c = rnd(120000, 350000);
+        if (S.efectivo <= c) return `La campaña costaría ${money(c)} y no te alcanza.`;
+        S.efectivo -= c;
+        const a = rnd(15, 28);
+        S.hype = clamp(S.hype + a);
+        say(`Gastaste ${money(c)} en demos y anuncios grandilocuentes. Hype +${a}.`, "event");
+        return true;
+      }
+    },
+    {
+      id: "contratar", titulo: "Contratar talento", verbo: "Contratar", stepper: true,
+      desc: `Más capacidad de I+D, pero cada persona suma ${money(CFG.SALARIO)} de gasto mensual.`,
+      meta: () => `Incorporación ${money(CFG.ONBOARDING * S.contratarN)}`,
+      bloqueo: () => { const c = CFG.ONBOARDING * S.contratarN; return S.efectivo <= c ? `Te faltan ${money(c - S.efectivo + 1)}` : ""; },
+      run() {
+        const n = S.contratarN, c = CFG.ONBOARDING * n;
+        S.efectivo -= c; S.emp += n;
+        say(`Contrataste ${n} persona(s). Equipo: ${S.emp}. Gasto mensual: ${money(gastos())}.`, "info");
+        return true;
+      }
+    },
+    {
+      id: "lanzar", titulo: "Lanzar producto", verbo: "Lanzar",
+      desc: "Empiezas a generar ingresos cada mes según tu valor real.",
+      meta: () => S.lanzado ? "Ya lanzado" : `Requiere valor real ${CFG.MIN_LANZAR} (tienes ${S.real})`,
+      bloqueo: () => S.lanzado ? "Ya lanzaste tu producto principal" : S.real < CFG.MIN_LANZAR ? `Necesitas valor real ${CFG.MIN_LANZAR}` : "",
+      run() {
+        S.lanzado = true; S.hype = clamp(S.hype + 20); S.real = clamp(S.real + 12);
+        say(`Lanzaste tu producto. Ingresos: ${money(ingresos())} al mes.`, "good");
+        return true;
+      }
+    },
+    {
+      id: "cobertura", titulo: "Cobertura anticrisis", verbo: "Asegurar",
+      desc: "Reservas y contratos a largo plazo. Si la burbuja se pincha, el golpe a tu hype es mucho menor durante 6 meses.",
+      meta: () => `Costo ${money(CFG.COBERTURA)} · protege 6 meses`,
+      bloqueo: () => activo("cobertura") ? "Ya tienes una cobertura activa" :
+        S.efectivo <= CFG.COBERTURA ? `Te faltan ${money(CFG.COBERTURA - S.efectivo + 1)}` : "",
+      run() {
+        S.efectivo -= CFG.COBERTURA; iniciarEfecto("cobertura", 6);
+        say(`Contrataste una cobertura anticrisis por ${money(CFG.COBERTURA)}. Estás más protegido ante un pinchazo.`, "good");
+        return true;
+      }
+    },
+    {
+      id: "secundaria", titulo: "Vender acciones secundarias", verbo: "Vender",
+      desc: "Vendes 6% de la empresa a inversores eufóricos. Dinero rápido sin ronda, pero tu parte baja y el mercado lo nota.",
+      meta: () => `Recibes ${money(Math.floor(S.valoracion * 0.06))} · tu parte −6 puntos · hype −6`,
+      bloqueo: () => rondaBloqueada() ? "Con el mercado congelado nadie compra" :
+        S.prop < 0.35 ? "Tu parte ya es muy baja para vender más" :
+        S.secDesde < 4 ? `Los compradores esperan: disponible en ${4 - S.secDesde} mes(es)` : "",
+      run() {
+        const c = Math.floor(S.valoracion * 0.06);
+        S.secDesde = 0;
+        S.efectivo += c; S.prop = Math.max(0, S.prop - 0.06); S.hype = clamp(S.hype - 6);
+        say(`Vendiste 6% de la empresa en el mercado secundario por ${money(c)}. Ahora posees ${Math.round(S.prop * 100)}%. Hype −6.`, "info");
+        return true;
+      }
+    },
+    {
+      id: "moderar", titulo: "Moderar expectativas", verbo: "Moderar",
+      desc: "Dices en público que tu producto todavía no es AGI. Bajas el hype por tu cuenta, reduces el riesgo de burbuja y ganas credibilidad.",
+      meta: () => "Gratis · hype −8 a −14 · valor real +1",
+      bloqueo: () => S.hype < 14 ? "Tu hype ya es bajo" : "",
+      run() {
+        const d = rnd(8, 14);
+        S.hype = clamp(S.hype - d); S.real = clamp(S.real + 1);
+        say(`Moderaste las expectativas en público. Hype −${d}, valor real +1: la honestidad da confianza.`, "good");
+        return true;
+      }
+    }
+  ];
+  function bloqueo(a) {
+    if (S.fin) return "Partida terminada";
+    if (S.ap <= 0) return "Sin acciones este mes: cierra el mes";
+    return a.bloqueo();
+  }
+  // Devuelve true si se hizo, o un texto si no se pudo (sin gastar acción)
+  function ejecutar(a) {
+    const b = bloqueo(a);
+    if (b) return b;
+    const r = a.run();
+    if (r === true) S.ap -= 1;
+    return r;
+  }
+
+  // ---------- Eventos aleatorios ----------
+  const EVENTOS = [
+    // Buenas noticias
+    { w: 2, run() { S.hype = clamp(S.hype + 12); return ["Un influencer famoso habla de tu startup. Hype +12.", "good"]; } },
+    { w: 2, run() { S.real = clamp(S.real + 8); return ["Consigues un cliente piloto importante. Valor real +8.", "good"]; } },
+    { w: 2, run() { S.real = clamp(S.real + 10); return ["Tu modelo genera resultados sorprendentes en pruebas internas. Valor real +10.", "good"]; } },
+    { w: 2, run() { S.hype = clamp(S.hype + 15); return ["Consigues cobertura en TechCrunch. Hype +15.", "good"]; } },
+    { w: 1.5, run() { const g = rnd(100000, 250000); S.efectivo += g; return [`Ganas una subvención del gobierno para IA: ${money(g)}.`, "good"]; } },
+    { w: 1, run() { S.hype = clamp(S.hype + 10); S.real = clamp(S.real + 4); return ["Ganas un premio de innovación. Hype +10, valor real +4.", "good"]; } },
+    { w: 1, cond: () => S.emp < 15, run() { S.emp += 1; return ["Una ingeniera estrella te contacta y se une al equipo sin costo de reclutamiento.", "good"]; } },
+    // Malas noticias
+    { w: 2, run() { S.hype = clamp(S.hype - 10); return ["Un paper científico cuestiona tu enfoque técnico. Hype −10.", "bad"]; } },
+    { w: 2, run() { S.hype = clamp(S.hype - 15); return ["Sale una noticia de que «la IA es una burbuja». Hype −15.", "bad"]; } },
+    { w: 2, run() { S.hype = clamp(S.hype - 8); return ["Un competidor anuncia algo muy similar. Hype −8.", "bad"]; } },
+    { w: 1.5, cond: () => S.emp > 1, run() { S.emp -= 1; return ["Un empleado clave se va a OpenAI. Pierdes 1 persona del equipo.", "bad"]; } },
+    { w: 1, run() { const p = rnd(80000, 150000); S.efectivo -= p; S.hype = clamp(S.hype - 8); return [`Fuga de datos: pagas ${money(p)} en auditoría y multas. Hype −8.`, "bad"]; } },
+    { w: 1, run() { const p = rnd(60000, 120000); S.efectivo -= p; return [`Se cae la nube de tu proveedor durante días: pierdes ${money(p)} en pérdidas y créditos.`, "bad"]; } },
+    { w: 1, run() { const p = rnd(120000, 250000); S.efectivo -= p; S.real = clamp(S.real - 3); return [`Una demanda por derechos de autor sobre tus datos de entrenamiento: ${money(p)} y valor real −3.`, "bad"]; } },
+    { w: 1.5, run() { S.hype = clamp(S.hype - 12); return ["Un modelo open source gratuito iguala tu demo estrella. Hype −12.", "bad"]; } },
+    { w: 1, cond: () => S.lanzado, run() { S.real = clamp(S.real - 6); return ["Un cliente grande cancela su contrato. Valor real −6.", "bad"]; } },
+    // Crisis y cambios de mercado (duran varios meses)
+    { w: 1.6, cond: () => !activo("ram"), run() {
+      const m = rnd(3, 4); iniciarEfecto("ram", m); S.crisis++;
+      return [`Crisis de RAM: una escasez mundial de memoria y GPUs dispara los precios. El I+D cuesta +60% durante ${m} meses.`, "bad"]; } },
+    { w: 1.1, cond: () => !activo("recesion") && !activo("fomo") && S.mes >= 4, run() {
+      const m = rnd(3, 5); iniciarEfecto("recesion", m); S.crisis++;
+      return [`Recesión global: los inversores congelan las rondas, los clientes recortan gasto y el hype se enfría durante ${m} meses.`, "bad"]; } },
+    { w: 1.2, cond: () => !activo("fomo") && !activo("recesion") && !activo("tasas"), run() {
+      const m = rnd(2, 3); iniciarEfecto("fomo", m);
+      return [`Fiebre inversora: los fondos compiten por entrar a cualquier startup de IA. Las rondas traen +50% durante ${m} meses.`, "good"]; } },
+    { w: 1, cond: () => !activo("energia"), run() {
+      const m = rnd(3, 4); iniciarEfecto("energia", m); S.crisis++;
+      return [`Alza de energía: los centros de datos suben sus tarifas. Tus gastos operativos +15% durante ${m} meses.`, "bad"]; } },
+    { w: 1, cond: () => !activo("regulacion") && S.mes >= 6, run() {
+      const m = rnd(4, 6); iniciarEfecto("regulacion", m);
+      return [`Nueva regulación de IA: auditorías y cumplimiento. El I+D cuesta +20% y el hype baja durante ${m} meses.`, "bad"]; } },
+    { w: 1, cond: () => S.lanzado && !activo("precios") && !activo("boom"), run() {
+      const m = rnd(3, 4); iniciarEfecto("precios", m); S.crisis++;
+      return [`Guerra de precios: un gigante regala su API. Tus ingresos −25% durante ${m} meses.`, "bad"]; } },
+    { w: 1, cond: () => !activo("tasas") && !activo("fomo"), run() {
+      const m = rnd(3, 5); iniciarEfecto("tasas", m);
+      return [`Suben las tasas de interés: el dinero se encarece. Las rondas traen 20% menos durante ${m} meses.`, "bad"]; } },
+    { w: 1, cond: () => S.lanzado && !activo("boom") && !activo("precios"), run() {
+      const m = rnd(2, 3); iniciarEfecto("boom", m);
+      return [`Boom de clientes: las empresas corren a adoptar IA. Tus ingresos +30% durante ${m} meses.`, "good"]; } },
+    // Noticias que mueven la burbuja del mercado
+    { w: 1.2, run() { mercadoMover(8); S.hype = clamp(S.hype + 5); return ["Un gigante tecnológico anuncia $100.000 millones en centros de datos para IA. El mercado se entusiasma. Índice +8, hype +5.", "good"]; } },
+    { w: 1.2, cond: () => S.idx > 40, run() { mercadoMover(-8); S.hype = clamp(S.hype - 5); return ["Un fondo famoso apuesta en corto contra las empresas de IA. Índice −8, hype −5.", "bad"]; } },
+    { w: 1.2, cond: () => S.idx > 35, run() { mercadoMover(-6); S.hype = clamp(S.hype - 6); return ["Quiebra una startup de IA muy famosa y el mercado se pone nervioso. Índice −6, hype −6.", "bad"]; } },
+    { w: 1.2, run() { mercadoMover(7); S.hype = clamp(S.hype + 6); return ["Una startup rival se vende por una cifra absurda y todos quieren su parte de la IA. Índice +7, hype +6.", "good"]; } },
+    { w: 1, cond: () => S.idx > 45, run() { mercadoMover(-5); S.hype = clamp(S.hype - 6); return ["Un economista famoso compara la IA con la burbuja punto com. Índice −5, hype −6.", "bad"]; } }
+  ];
+
+  // ---------- Decisiones (dos caminos, cada uno con riesgo) ----------
+  const DECISIONES = [
+    { w: 1.5, cond: () => S.mes >= 3, crear() {
+      const monto = Math.floor(S.valoracion * rf(0.2, 0.4) * mult("ronda"));
+      const dil = monto / (S.valoracion + monto);
+      return {
+        titulo: "Un fondo te ofrece una ronda sorpresa",
+        texto: `Un fondo famoso quiere entrar ya, sin esperar a tu próxima ronda: ${money(monto)} a cambio de ${Math.round(dil * 100)}% de la empresa.`,
+        opciones: [
+          { label: "Aceptar la oferta", desc: `+${money(monto)} de caja, hype +10, te diluyes ${Math.round(dil * 100)}%.`,
+            bloq: () => rondaBloqueada() ? "Con la recesión el fondo se echó atrás" : "",
+            run() { S.efectivo += monto; S.prop *= 1 - dil; S.hype = clamp(S.hype + 10); S.desde = 0; return ["Aceptaste la ronda sorpresa. El dinero entra y el hype sube.", "good"]; } },
+          { label: "Rechazarla", desc: "Conservas tu parte. Hype +3 por tu seguridad.",
+            run() { S.hype = clamp(S.hype + 3); return ["Rechazaste la oferta y proyectas confianza. Hype +3.", "info"]; } }
+        ] };
+    } },
+    { w: 3, cond: () => activo("ram") && S.efectivo > 160000, crear() {
+      return {
+        titulo: "Tu proveedor ofrece un contrato de RAM",
+        texto: "Con la crisis de RAM, tu proveedor propone congelar los precios si pagas por adelantado.",
+        opciones: [
+          { label: "Firmar el contrato ($140.000)", desc: "La crisis de RAM deja de afectarte.",
+            bloq: () => S.efectivo <= 140000 ? "No tienes caja suficiente" : "",
+            run() { S.efectivo -= 140000; S.efectos = S.efectos.filter((e) => e.id !== "ram"); return ["Firmaste el contrato: tu I+D vuelve a su precio normal.", "good"]; } },
+          { label: "Esperar a que pase", desc: "Sin gasto ahora, pero el I+D sigue caro.",
+            run() { return ["Decidiste esperar. La crisis de RAM sigue su curso.", "info"]; } }
+        ] };
+    } },
+    { w: 1, cond: () => S.mes >= 10 && S.lanzado, crear() {
+      const oferta = Math.floor(S.valoracion * rf(0.8, 1.1));
+      return {
+        titulo: "Una big tech quiere comprarte",
+        texto: `Te ofrecen ${money(oferta)} por la empresa (tu parte: ${Math.round(S.prop * 100)}%). Es una salida segura, pero termina la partida.`,
+        opciones: [
+          { label: "Vender la empresa", desc: `Cobras ${money(oferta * S.prop)} y ganas con una salida anticipada.`,
+            run() {
+              S.vendida = true; S.ventaValor = Math.floor(oferta * S.prop);
+              terminar(true, riesgo() > 50
+                ? "Vendiste cerca del pico del hype: la burbuja pagó tu salida."
+                : "Vendiste antes de ver cuánto podía crecer tu producto.");
+              return ["Aceptaste la oferta de compra.", "good"];
+            } },
+          { label: "Seguir solo", desc: "Rechazas la oferta. Hype +5.",
+            run() { S.hype = clamp(S.hype + 5); return ["Rechazaste la compra y sigues construyendo. Hype +5.", "info"]; } }
+        ] };
+    } },
+    { w: 1.5, cond: () => S.emp >= 4 && S.efectivo > 90000, crear() {
+      return {
+        titulo: "Un competidor quiere llevarse a tu equipo",
+        texto: "Una empresa rival ofrece salarios más altos a tus ingenieros.",
+        opciones: [
+          { label: "Pagar bonos de retención ($70.000)", desc: "Nadie se va.",
+            bloq: () => S.efectivo <= 70000 ? "No tienes caja suficiente" : "",
+            run() { S.efectivo -= 70000; return ["Pagaste bonos y el equipo se queda.", "good"]; } },
+          { label: "Dejarlos ir", desc: "Pierdes 2 personas, pero bajan tus gastos.",
+            run() { S.emp = Math.max(1, S.emp - 2); return ["Dos ingenieros se van con la competencia.", "bad"]; } }
+        ] };
+    } },
+    { w: 1.2, cond: () => S.hype > 40, crear() {
+      return {
+        titulo: "Un periodista prepara un reportaje crítico",
+        texto: "Un medio influyente investiga si tus demos son tan buenos como dices.",
+        opciones: [
+          { label: "Contratar agencia de PR ($90.000)", desc: "Controlas el mensaje. Hype +4.",
+            bloq: () => S.efectivo <= 90000 ? "No tienes caja suficiente" : "",
+            run() { S.efectivo -= 90000; S.hype = clamp(S.hype + 4); return ["La agencia de PR controla la narrativa. Hype +4.", "good"]; } },
+          { label: "Ignorarlo y esperar", desc: "60% de que sea un golpe duro (hype −15), 40% de que pase sin ruido.",
+            run() {
+              if (Math.random() < 0.6) { S.hype = clamp(S.hype - 15); return ["El reportaje sale y es duro con tus demos. Hype −15.", "bad"]; }
+              return ["El reportaje nunca se publicó. Te libraste.", "good"];
+            } }
+        ] };
+    } },
+    { w: 2, cond: () => S.idx >= 65 && !rondaBloqueada() && S.mes >= 4, crear() {
+      const monto = Math.floor(S.valoracion * rf(0.5, 0.75));
+      const dil = monto / (S.valoracion + monto);
+      return {
+        titulo: "Un fondo te ofrece una valoración desmedida",
+        texto: `En plena euforia, un fondo quiere pagar ${money(monto)} por el ${Math.round(dil * 100)}% de tu empresa, sin hacer demasiadas preguntas. Es muchísimo dinero, pero también más hype del que tu producto respalda.`,
+        opciones: [
+          { label: "Aceptar el cheque", desc: `+${money(monto)}, te diluyes ${Math.round(dil * 100)}% y el hype sube +15 (más riesgo de burbuja).`,
+            run() { S.efectivo += monto; S.prop *= 1 - dil; S.hype = clamp(S.hype + 15); S.desde = 0; return ["Aceptaste el cheque. Caja de sobra, pero el hype quedó muy por encima del producto.", "good"]; } },
+          { label: "Rechazarlo", desc: "No te diluyes y mantienes los pies en la tierra.",
+            run() { return ["Rechazaste la valoración desmedida y seguiste construyendo.", "info"]; } }
+        ] };
+    } },
+    { w: 3, cond: () => S.idx >= 70 && !activo("cobertura") && !activo("pinchazo"), crear() {
+      return {
+        titulo: "Un inversor veterano te advierte del pinchazo",
+        texto: "Vivió la burbuja punto com y dice que esto se le parece demasiado. Te sugiere asegurarte antes de que el mercado se dé vuelta.",
+        opciones: [
+          { label: `Pagar una cobertura (${money(CFG.COBERTURA)})`, desc: "Si la burbuja se pincha, el golpe a tu hype será mucho menor durante 6 meses.",
+            bloq: () => S.efectivo <= CFG.COBERTURA ? "No tienes caja suficiente" : "",
+            run() { S.efectivo -= CFG.COBERTURA; iniciarEfecto("cobertura", 6); return ["Pagaste la cobertura anticrisis. Estás más protegido ante un pinchazo.", "good"]; } },
+          { label: "Ignorar la advertencia", desc: "Ahorras la plata y confías en que el mercado aguante.",
+            run() { return ["Ignoraste la advertencia. Ya veremos quién tenía razón.", "info"]; } }
+        ] };
+    } }
+  ];
+
+  function elegirDecision(i) {
+    const d = S.decision;
+    if (!d || d.elegida) return null;
+    const o = d.opciones[i];
+    if (o.bloq && o.bloq()) return null;
+    const res = o.run();
+    d.elegida = true; d.indice = i;
+    say(res[0], res[1]);
+    if (S.fin) registrarHistorial(); else iniciarMes();
+    return res;
+  }
+
+  // ---------- Cierre de mes ----------
+  function paso(titulo, texto, kind, valor) {
+    S.reporte.push({ titulo, texto, kind: kind || "info", valor: valor || "" });
+  }
+  function terminar(v, motivo) { S.fin = true; S.victoria = v; S.motivo = motivo; }
+
+  function cerrarMes() {
+    const cerrado = S.mes, caja0 = S.efectivo;
+    S.reporte = []; S.decision = null; S.mesCerrado = cerrado;
+
+    // 1) Costos
+    const gas = gastos();
+    S.efectivo -= gas;
+    paso("Costos operativos", `Pagas sueldos de ${S.emp} persona(s)${activo("energia") ? ", con el sobrecosto de energía" : ""}.`, "info", money(-gas));
+
+    // 2) Ingresos
+    const ing = ingresos();
+    S.efectivo += ing;
+    say(`Ingresos ${money(ing)} · costos operativos ${money(gas)}.`, "info");
+    paso("Ingresos", S.lanzado
+      ? `Tu producto genera ingresos según su valor real (${S.real})${activo("boom") ? ", impulsados por el boom de clientes" : activo("precios") ? ", recortados por la guerra de precios" : activo("recesion") ? ", recortados por la recesión" : ""}.`
+      : "Aún no tienes producto en el mercado, así que no entra dinero de clientes.", S.lanzado ? "good" : "info", money(ing));
+
+    // 3) Condiciones del mercado activas
+    if (S.efectos.length) {
+      const d = suma("hypeMes");
+      if (d) S.hype = clamp(S.hype + d);
+      const nombres = S.efectos.map((e) => `${EFECTOS[e.id].nombre} (${e.meses} mes${e.meses === 1 ? "" : "es"} restantes)`).join(", ");
+      const malo = S.efectos.some((e) => EFECTOS[e.id].tipo === "bad");
+      paso("Condiciones del mercado", `Siguen activas: ${nombres}.${d ? ` El hype cambia ${d}.` : ""}`, malo ? "bad" : "good");
+      S.efectos.forEach((e) => { e.meses -= 1; });
+      const terminados = S.efectos.filter((e) => e.meses <= 0);
+      S.efectos = S.efectos.filter((e) => e.meses > 0);
+      terminados.forEach((e) => {
+        paso("Fin de condición", `Terminó: ${EFECTOS[e.id].nombre}.`, EFECTOS[e.id].tipo === "bad" ? "good" : "info");
+        say(`Terminó: ${EFECTOS[e.id].nombre}.`, "info");
+      });
+    }
+
+    // 4) Noticias y eventos
+    if (Math.random() < 0.7) {
+      const cand = EVENTOS.filter((e) => !e.cond || e.cond());
+      const [txt, kind] = pesado(cand).run();
+      paso("Noticias del mercado", txt, kind === "good" ? "good" : kind === "bad" ? "bad" : "event");
+      say(txt, kind);
+    } else {
+      paso("Noticias del mercado", "Un mes tranquilo: no hubo noticias relevantes.", "info");
+    }
+
+    // 5) El hype se enfría solo
+    if (Math.random() < 0.4) {
+      const d = rnd(2, 6);
+      S.hype = clamp(S.hype - d);
+      paso("El hype se enfría", `Sin novedades, la atención baja. Hype −${d}.`, "info");
+    } else {
+      paso("El hype se mantiene", "La conversación sobre tu startup sigue estable.", "info");
+    }
+
+    // 5b) Termómetro del mercado: la burbuja global
+    const mk = moverMercado();
+    paso(mk.titulo, mk.texto, mk.kind, mk.valor);
+
+    // 6) Revisión de burbuja
+    const r = riesgo();
+    if (r > CFG.UMBRAL && Math.random() < 0.10 + (r - CFG.UMBRAL) / 100) {
+      S.hype = Math.floor(S.hype * rf(0.4, 0.6));
+      S.corr += 1; S.desde = -2;
+      S.marks.push(Math.min(S.mes + 1, CFG.MESES));
+      const t = `Corrección de mercado: la burbuja se pincha y el hype cae a ${S.hype}. Los inversores se cierran por un tiempo.`;
+      paso("Revisión de burbuja", t, "bad", `riesgo ${r}%`);
+      say(t, "bad");
+    } else if (r > CFG.UMBRAL) {
+      paso("Revisión de burbuja", "El mercado dudó de tu valoración pero no corrigió. Tuviste suerte este mes.", "bad", `riesgo ${r}%`);
+    } else {
+      paso("Revisión de burbuja", "El hype está razonablemente respaldado por tu producto.", "good", `riesgo ${r}%`);
+    }
+
+    // 7) Nuevo mes y comprobación de final
+    S.mes += 1; S.desde += 1; S.secDesde += 1; S.ap = CFG.ACCIONES_MES;
+
+    if (S.efectivo <= 0) terminar(false, "Te quedaste sin dinero. La startup quebró.");
+    else if (S.lanzado && S.mes > 18 && S.real >= CFG.ADQUISICION && riesgo() < 40)
+      terminar(true, "Una big tech te adquiere. Tu producto es real y el precio está justificado.");
+    else if (S.mes > CFG.MESES) {
+      if (S.lanzado && neta() <= 0) terminar(true, "Sobreviviste a la burbuja y eres rentable. Construiste un negocio de verdad.");
+      else terminar(false, "Tras 3 años sin un negocio sólido, los inversores se cansaron.");
+    }
+
+    if (S.fin) {
+      registrarHistorial();
+      paso("Desenlace", S.motivo, S.victoria ? "good" : "bad");
+    } else {
+      // ¿Hay que tomar una decisión?
+      if (S.mes >= 3 && Math.random() < 0.16) {
+        const cand = DECISIONES.filter((d) => !d.cond || d.cond());
+        if (cand.length) S.decision = Object.assign({ elegida: false }, pesado(cand).crear());
+      }
+      iniciarMes();
+      paso("Balance del mes", `Entras al mes ${S.mes} con ${money(S.efectivo)} en caja. Tu valoración ahora es ${money(S.valoracion)}.`, "info", money(S.efectivo - caja0));
+    }
+  }
+
+  return {
+    CFG, EFECTOS, ACCIONES, S, money, reiniciar, ejecutar, bloqueo, cerrarMes, elegirDecision,
+    registrarHistorial, riesgo, gastos, ingresos, neta, runway, costoID, fase, probPinchazo
+  };
+})();
+</script>
+
+<!-- Interfaz -->
+<script>
+(function () {
+  "use strict";
+  const { S, CFG, EFECTOS, ACCIONES, money } = Motor;
+  const $ = (id) => document.getElementById(id);
+  const reducido = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let nombrePendiente = null;
+  let tutoEmpieza = false;
+
+  // ---------- Acciones ----------
+  const refs = {};
+  function construirAcciones() {
+    const cont = $("acts");
+    cont.innerHTML = "";
+    ACCIONES.forEach((a) => {
+      const row = document.createElement("div");
+      row.className = "act";
+      const info = document.createElement("div");
+      info.innerHTML = `<h3></h3><p class="d"></p><p class="meta"></p>`;
+      info.querySelector("h3").textContent = a.titulo;
+      info.querySelector(".d").textContent = a.desc;
+      const ctl = document.createElement("div");
+      ctl.className = "act-ctl";
+      if (a.stepper) {
+        const st = document.createElement("div");
+        st.className = "stepper";
+        st.innerHTML = `<button type="button" aria-label="Menos personas">−</button><output aria-live="polite">1</output><button type="button" aria-label="Más personas">+</button>`;
+        const b = st.querySelectorAll("button");
+        refs.hireOut = st.querySelector("output");
+        b[0].addEventListener("click", () => { S.contratarN = Math.max(1, S.contratarN - 1); render(); });
+        b[1].addEventListener("click", () => { S.contratarN = Math.min(5, S.contratarN + 1); render(); });
+        ctl.appendChild(st);
+      }
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "btn"; btn.textContent = a.verbo;
+      btn.addEventListener("click", () => {
+        nota("");
+        const r = Motor.ejecutar(a);
+        if (r !== true) { nota(r.endsWith(".") ? r : r + "."); return; }
+        render();
+      });
+      ctl.appendChild(btn);
+      row.appendChild(info); row.appendChild(ctl);
+      cont.appendChild(row);
+      refs[a.id] = { btn, meta: info.querySelector(".meta") };
+    });
+  }
+  function nota(t) { $("note").textContent = t || ""; }
+
+  // ---------- Render ----------
+  function meter(idFill, idVal, valor, color) {
+    $(idFill).style.width = valor + "%";
+    if (color) $(idFill).style.background = color;
+    $(idVal).textContent = valor + (idFill === "fRisk" ? "%" : "/100");
+  }
+
+  function render() {
+    const mesVis = Math.min(S.mes, CFG.MESES);
+    $("gName").textContent = S.nombre;
+    $("mesTxt").textContent = `Mes ${mesVis} de ${CFG.MESES}`;
+    $("mesBar").style.width = ((mesVis - 1) / (CFG.MESES - 1)) * 100 + "%";
+    $("rondaTxt").textContent = S.desde < 0 ? "Invierno de financiación" : "";
+
+    $("vCash").textContent = money(S.efectivo);
+    const rw = Motor.runway();
+    const cashSub = $("sCash");
+    cashSub.textContent = isFinite(rw) ? `Caja para ${rw.toFixed(1)} meses al ritmo actual` : "Rentable: no quemas caja";
+    cashSub.classList.toggle("warn", rw < 3);
+    $("vVal").textContent = money(S.valoracion);
+    $("sVal").textContent = `Tu parte: ${Math.round(S.prop * 100)}% · máxima ${money(S.valMax)}`;
+    $("vEmp").textContent = S.emp;
+    $("sEmp").textContent = `Gastos ${money(Motor.gastos())}/mes · ingresos ${money(Motor.ingresos())}/mes`;
+
+    const r = Motor.riesgo();
+    meter("fHype", "vHype", S.hype);
+    meter("fReal", "vReal", S.real);
+    meter("fRisk", "vRisk", r, r > CFG.UMBRAL ? "var(--danger)" : r > 40 ? "var(--hype)" : "var(--real)");
+
+    const brecha = S.hype - S.real;
+    const gn = $("gapNote");
+    if (r > CFG.UMBRAL) { gn.textContent = `El hype supera al valor real por ${brecha} puntos. El mercado puede corregir en cualquier momento.`; gn.className = "gap-note warn"; }
+    else if (brecha > 0) { gn.textContent = `El hype va ${brecha} puntos por delante del valor real.`; gn.className = "gap-note"; }
+    else { gn.textContent = `El valor real va ${-brecha} puntos por delante del hype. Tu valoración tiene respaldo.`; gn.className = "gap-note"; }
+
+    renderBurbuja();
+
+    // Condiciones del mercado
+    const mk = $("market");
+    mk.innerHTML = "";
+    if (!S.efectos.length) {
+      const p = document.createElement("p"); p.className = "none"; p.textContent = "Mercado estable: no hay crisis ni condiciones especiales activas.";
+      mk.appendChild(p);
+    } else {
+      S.efectos.forEach((e) => {
+        const def = EFECTOS[e.id];
+        const c = document.createElement("div");
+        c.className = "chip " + def.tipo;
+        c.innerHTML = `<b></b><span></span>`;
+        c.querySelector("b").textContent = def.nombre;
+        c.querySelector("span").textContent = `${def.desc} · ${e.meses} mes${e.meses === 1 ? "" : "es"}`;
+        mk.appendChild(c);
+      });
+    }
+
+    // Acciones
+    ACCIONES.forEach((a) => {
+      const b = Motor.bloqueo(a);
+      refs[a.id].btn.disabled = !!b;
+      refs[a.id].meta.textContent = b || a.meta();
+      refs[a.id].meta.classList.toggle("no", !!b);
+    });
+    if (refs.hireOut) refs.hireOut.textContent = S.contratarN;
+
+    let pips = "";
+    for (let i = 0; i < CFG.ACCIONES_MES; i++) pips += `<span class="pip${i < S.ap ? " on" : ""}"></span>`;
+    $("pips").innerHTML = pips + `<em>${S.ap} de ${CFG.ACCIONES_MES}</em>`;
+    $("pips").setAttribute("aria-label", `${S.ap} de ${CFG.ACCIONES_MES} acciones disponibles`);
+    $("closeBtn").disabled = S.fin;
+    $("closeHint").textContent = S.ap > 0
+      ? `Te quedan ${S.ap} acción(es) sin usar este mes. Cerrar el mes procesa gastos, ingresos y noticias.`
+      : "Usaste todas tus acciones. Cierra el mes para ver qué pasa.";
+
+    renderLog();
+    renderChart();
+  }
+
+  function renderBurbuja() {
+    const f = Motor.fase();
+    const idx = S.idx;
+    const r = 20 + (idx / 100) * 50;
+    const rr = r * 0.72;
+    const pt = (a) => `${(75 + rr * Math.cos(a)).toFixed(1)} ${(75 + rr * Math.sin(a)).toFixed(1)}`;
+    const svg = $("bubSvg");
+    svg.setAttribute("class", "ph" + f.clase);
+    svg.style.setProperty("--wob", (3.2 - (idx / 100) * 2.4).toFixed(2) + "s");
+    $("bubBody").setAttribute("r", r.toFixed(1));
+    $("bubShine").setAttribute("d", `M${pt(-2.7)} A${rr.toFixed(1)} ${rr.toFixed(1)} 0 0 1 ${pt(-1.9)}`);
+    $("bubNum").textContent = idx;
+    $("bubCracks").toggleAttribute("hidden", !(idx >= 85 && f.clase !== "W"));
+    $("bubFase").textContent = f.nombre;
+    $("bubAdv").textContent = f.consejo;
+    const p = Motor.probPinchazo();
+    const el = $("bubProb");
+    const inv = S.efectos.find((e) => e.id === "pinchazo");
+    if (inv) { el.textContent = `El invierno dura ${inv.meses} mes${inv.meses === 1 ? "" : "es"} más. Las rondas están congeladas.`; el.className = "prob"; }
+    else if (p > 0) { el.textContent = `Probabilidad aproximada de pinchazo al cerrar este mes: ${Math.round(p * 100)}%.`; el.className = "prob" + (p >= 0.15 ? " warn" : ""); }
+    else { el.textContent = "Sin señales de pinchazo por ahora."; el.className = "prob"; }
+  }
+
+  function renderLog() {
+    const ul = $("log");
+    ul.innerHTML = "";
+    const items = S.log.slice(-60).reverse();
+    items.forEach((e) => {
+      const li = document.createElement("li");
+      const m = document.createElement("span"); m.className = "m"; m.textContent = "Mes " + e.mes;
+      const t = document.createElement("span"); t.className = "t " + e.kind; t.textContent = e.text;
+      li.appendChild(m); li.appendChild(t); ul.appendChild(li);
+    });
+  }
+
+  function renderChart() {
+    const W = 640, H = 250, L = 36, R = 14, T = 14, B = 28;
+    const X = (m) => L + ((m - 1) / (CFG.MESES - 1)) * (W - L - R);
+    const Y = (v) => T + ((100 - v) / 100) * (H - T - B);
+    let s = "";
+    [0, 50, 100].forEach((v) => {
+      s += `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/>`;
+      s += `<text class="ax" x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+    });
+    [1, 12, 24, 36].forEach((m) => { s += `<text class="ax" x="${X(m)}" y="${H - 8}" text-anchor="middle">${m}</text>`; });
+    s += `<text class="ax" x="${W - R}" y="${T - 3}" text-anchor="end">mes</text>`;
+    S.marks.forEach((m) => { s += `<line class="mk" x1="${X(m)}" x2="${X(m)}" y1="${T}" y2="${H - B}"/>`; });
+    const h = S.hist;
+    for (let i = 1; i < h.length; i++) {
+      const a = h[i - 1], b = h[i];
+      const cls = (a.hype - a.real + b.hype - b.real) > 0 ? "gb" : "gg";
+      s += `<polygon class="${cls}" points="${X(a.mes)},${Y(a.hype)} ${X(b.mes)},${Y(b.hype)} ${X(b.mes)},${Y(b.real)} ${X(a.mes)},${Y(a.real)}"/>`;
+    }
+    const line = (k) => h.map((p) => `${X(p.mes)},${Y(p[k])}`).join(" ");
+    if (h.length > 1) {
+      s += `<polyline class="lm" points="${line("idx")}"/>`;
+      s += `<polyline class="lr" points="${line("real")}"/>`;
+      s += `<polyline class="lh" points="${line("hype")}"/>`;
+    }
+    if (h.length) {
+      const p = h[h.length - 1];
+      s += `<circle class="dr" cx="${X(p.mes)}" cy="${Y(p.real)}" r="4.5"/>`;
+      s += `<circle class="dh" cx="${X(p.mes)}" cy="${Y(p.hype)}" r="4.5"/>`;
+    }
+    $("chart").innerHTML = s;
+  }
+
+  // ---------- Cierre de mes (pantalla de carga explicativa) ----------
+  let timer = null;
+  let pasoActual = 0;
+
+  function agregarPaso(p) {
+    const li = document.createElement("li");
+    li.className = "step " + p.kind;
+    li.innerHTML = `<span class="dot"></span><div><b></b><p></p></div><span class="val num"></span>`;
+    li.querySelector("b").textContent = p.titulo;
+    li.querySelector("p").textContent = p.texto;
+    li.querySelector(".val").textContent = p.valor;
+    $("cList").appendChild(li);
+    requestAnimationFrame(() => requestAnimationFrame(() => li.classList.add("in")));
+    li.scrollIntoView && li.scrollIntoView({ block: "nearest", behavior: reducido ? "auto" : "smooth" });
+  }
+
+  function cerrarMesUI() {
+    if (S.fin) return;
+    nota("");
+    Motor.cerrarMes();
+    mostrarCierre();
+  }
+
+  function mostrarCierre() {
+    const pasos = S.reporte;
+    $("cierre").hidden = false;
+    $("cTitle").textContent = `Cierre del mes ${S.mesCerrado}`;
+    $("cSub").textContent = "Esto es lo que pasó después de tus acciones.";
+    $("cList").innerHTML = "";
+    $("cDecision").hidden = true; $("cDecision").innerHTML = "";
+    $("cBar").style.width = "0%";
+    $("cNext").disabled = true; $("cNext").textContent = "Procesando…";
+    $("cSkip").hidden = false;
+    pasoActual = 0;
+    clearTimeout(timer);
+
+    const avanzar = () => {
+      if (pasoActual >= pasos.length) { finAnimacion(); return; }
+      agregarPaso(pasos[pasoActual]);
+      pasoActual++;
+      $("cBar").style.width = (pasoActual / pasos.length) * 100 + "%";
+      timer = setTimeout(avanzar, reducido ? 0 : 750);
+    };
+    avanzar();
+  }
+
+  function saltarAnimacion() {
+    clearTimeout(timer);
+    while (pasoActual < S.reporte.length) { agregarPaso(S.reporte[pasoActual]); pasoActual++; }
+    $("cBar").style.width = "100%";
+    finAnimacion();
+  }
+
+  function finAnimacion() {
+    clearTimeout(timer);
+    $("cSkip").hidden = true;
+    $("cSub").textContent = S.fin ? "La partida terminó." : "Listo. Así quedó tu startup.";
+    if (S.decision && !S.decision.elegida) mostrarDecision();
+    else habilitarSiguiente();
+  }
+
+  function habilitarSiguiente() {
+    const b = $("cNext");
+    b.disabled = false;
+    b.textContent = S.fin ? "Ver resultado" : `Continuar al mes ${Math.min(S.mes, CFG.MESES)}`;
+    b.focus();
+  }
+
+  function mostrarDecision() {
+    const d = S.decision;
+    const box = $("cDecision");
+    box.hidden = false;
+    box.innerHTML = `<p class="eyebrow">Tienes que decidir</p><h3></h3><p class="txt"></p><div class="opts"></div><p class="result" aria-live="polite"></p>`;
+    box.querySelector("h3").textContent = d.titulo;
+    box.querySelector(".txt").textContent = d.texto;
+    const opts = box.querySelector(".opts");
+    d.opciones.forEach((o, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "opt";
+      b.innerHTML = `<b></b><span></span>`;
+      b.querySelector("b").textContent = o.label;
+      const razon = o.bloq ? o.bloq() : "";
+      b.querySelector("span").textContent = razon || o.desc;
+      b.disabled = !!razon;
+      b.addEventListener("click", () => {
+        const res = Motor.elegirDecision(i);
+        if (!res) return;
+        opts.querySelectorAll("button").forEach((x) => { x.disabled = true; });
+        b.classList.add("chosen");
+        box.querySelector(".result").textContent = res[0];
+        habilitarSiguiente();
+        box.scrollIntoView && box.scrollIntoView({ block: "nearest" });
+      });
+      opts.appendChild(b);
+    });
+    $("cNext").textContent = "Elige una opción";
+    const primera = opts.querySelector("button:not(:disabled)");
+    if (primera) primera.focus();
+    box.scrollIntoView && box.scrollIntoView({ block: "nearest", behavior: reducido ? "auto" : "smooth" });
+  }
+
+  function cerrarCierre() {
+    $("cierre").hidden = true;
+    render();
+    if (S.fin) mostrarFinal();
+  }
+
+  // ---------- Final ----------
+  function mostrarFinal() {
+    const win = S.victoria;
+    $("finalCard").className = "ov-card " + (win ? "win" : "lose");
+    $("fKicker").textContent = S.vendida ? "Salida anticipada" : win ? "Victoria" : "Fin del juego";
+    $("fTitle").textContent = S.vendida ? "Vendiste la empresa" : win ? "Lo lograste" : "La startup cerró";
+    $("fMotivo").textContent = S.motivo;
+    const datos = [
+      ["Meses jugados", Math.min(S.mes - 1, CFG.MESES)],
+      ["Valoración máxima", money(S.valMax)],
+      ["Correcciones de mercado", S.corr],
+      ["Crisis superadas", S.crisis],
+      ["Pinchazos del mercado", S.pinchazos],
+      ["Hype final", S.hype + "/100"],
+      ["Valor real final", S.real + "/100"]
+    ];
+    if (win) datos.push(["Tu participación vale", money(S.vendida ? S.ventaValor : S.valoracion * S.prop)]);
+    $("fGrid").innerHTML = datos.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
+    $("fLesson").textContent = S.vendida
+      ? "Cobrar en el pico del hype es una estrategia válida, siempre que sepas que lo es. La pregunta es si el producto habría justificado esperar."
+      : win
+        ? "El hype abre puertas, pero lo que sostiene a una empresa es el producto y la caja. Equilibrar ambos fue la clave."
+        : S.corr
+          ? "Las burbujas se forman cuando el precio se desconecta del valor fundamental. Cuando el mercado corrige, solo sobrevive quien tiene producto real y caja suficiente."
+          : "Construir tecnología real toma tiempo y dinero. El hype da oxígeno temporal, pero tarde o temprano el mercado exige resultados.";
+    $("final").hidden = false;
+    $("again").focus();
+  }
+
+  // ---------- Tutorial ----------
+  const TUTO = [
+    { kick: "Paso 1 de 6", titulo: "Tu misión", html: `
+      <p>Eres fundador de una startup de IA. Tienes <b>36 meses</b> para convertirla en un negocio de verdad.</p>
+      <ul>
+        <li><b>Ganas si</b><span>lanzas un producto real y te adquieren, o llegas al mes 36 siendo rentable.</span></li>
+        <li><b>Pierdes si</b><span>se te acaba el efectivo, o pasan 3 años sin un negocio sólido.</span></li>
+      </ul>` },
+    { kick: "Paso 2 de 6", titulo: "Hype contra valor real", html: `
+      <p>El <b>hype</b> sube tu valoración y atrae inversores. El <b>valor real</b> es lo que sostiene tu producto. Cuanto más se separan, mayor es el riesgo de burbuja.</p>
+      <div class="demo">
+        <div><div class="mrow"><span class="k">Hype</span><b class="num">70/100</b></div><div class="mtrack"><i class="fHype" style="width:70%"></i></div></div>
+        <div><div class="mrow"><span class="k">Valor real</span><b class="num">25/100</b></div><div class="mtrack"><i class="fReal" style="width:25%"></i></div></div>
+        <div><div class="mrow"><span class="k">Riesgo de burbuja</span><b class="num">81%</b></div><div class="mtrack"><i style="width:81%;background:var(--danger)"></i></div></div>
+      </div>
+      <p>Sobre 70% el mercado puede corregir: el hype cae a la mitad y los inversores se cierran por un tiempo.</p>` },
+    { kick: "Paso 3 de 6", titulo: "La burbuja del mercado", html: `
+      <p>Además de tu startup existe una <b>burbuja de todo el mercado de IA</b>, con un índice de 0 a 100. Sube cuando todos se entusiasman y baja con las malas noticias. La ves como una burbuja que se infla en el tablero.</p>
+      <ul>
+        <li><b>Despertar</b><span>pocos creen en la IA: construye barato.</span></li>
+        <li><b>Boom</b><span>entra el dinero: levanta ronda y lanza.</span></li>
+        <li><b>Euforia</b><span>las valoraciones se disparan, con más riesgo.</span></li>
+        <li><b>Extrema</b><span>puede pincharse cualquier mes.</span></li>
+      </ul>
+      <p>Si se pincha, el hype cae para todos, las rondas se congelan y las valoraciones se hunden varios meses. Puedes anticiparte con una <b>cobertura anticrisis</b>, <b>vendiendo acciones secundarias</b> en el pico o <b>moderando las expectativas</b>.</p>` },
+    { kick: "Paso 4 de 6", titulo: "Acciones por mes", html: `
+      <p>Cada mes puedes hacer hasta <b>3 acciones</b>, repetidas o distintas. Cuando termines, cierras el mes.</p>
+      <ul>
+        <li><b>Ronda</b><span>entra dinero y sube el hype, pero te diluyes.</span></li>
+        <li><b>I+D</b><span>sube el valor real. Cuesta más con equipos grandes.</span></li>
+        <li><b>Campaña</b><span>sube el hype rápido, sin respaldo real.</span></li>
+        <li><b>Contratar</b><span>más capacidad, más gasto mensual.</span></li>
+        <li><b>Lanzar</b><span>necesitas valor real 45. Genera ingresos.</span></li>
+        <li><b>Cobertura</b><span>te protege si se pincha la burbuja.</span></li>
+        <li><b>Secundarias</b><span>vendes 6% por caja rápida.</span></li>
+        <li><b>Moderar</b><span>bajas tu hype a propósito y ganas credibilidad.</span></li>
+      </ul>` },
+    { kick: "Paso 5 de 6", titulo: "Qué pasa al cerrar el mes", html: `
+      <p>Una pantalla te muestra, paso a paso, lo que ocurre después de tus acciones:</p>
+      <ul>
+        <li><b>Costos</b><span>pagas sueldos y gastos.</span></li>
+        <li><b>Ingresos</b><span>entran si ya lanzaste tu producto.</span></li>
+        <li><b>Mercado</b><span>noticias, crisis y condiciones activas.</span></li>
+        <li><b>Hype</b><span>se enfría si no lo alimentas.</span></li>
+        <li><b>Mercado</b><span>el índice de la burbuja se mueve y puede pincharse.</span></li>
+        <li><b>Burbuja</b><span>se revisa si tu hype corrige.</span></li>
+      </ul>` },
+    { kick: "Paso 6 de 6", titulo: "Crisis y decisiones", html: `
+      <p>El mercado cambia y no siempre a tu favor. Pueden aparecer una <b>crisis de RAM</b>, una <b>recesión</b>, nuevas <b>regulaciones</b>, alzas de energía o una fiebre inversora. Duran varios meses y se muestran sobre el tablero.</p>
+      <p>A veces tendrás que <b>decidir</b>: aceptar una oferta de compra, retener a tu equipo o responder a un periodista. Todas tienen un riesgo.</p>
+      <p>Consejo: guarda caja para los meses malos.</p>` }
+  ];
+  let tPaso = 0;
+
+  function renderTuto() {
+    const t = TUTO[tPaso];
+    $("tKick").textContent = t.kick;
+    $("tTitle").textContent = t.titulo;
+    $("tBody").innerHTML = t.html;
+    $("tDots").innerHTML = TUTO.map((_, i) => `<i class="${i === tPaso ? "on" : ""}"></i>`).join("");
+    $("tBack").hidden = tPaso === 0;
+    const ultimo = tPaso === TUTO.length - 1;
+    $("tNext").textContent = ultimo ? (tutoEmpieza ? "Empezar a jugar" : "Entendido") : "Siguiente";
+    $("tSkip").hidden = ultimo;
+  }
+  function abrirTuto(empieza) {
+    tutoEmpieza = empieza; tPaso = 0;
+    $("tuto").hidden = false;
+    renderTuto();
+    $("tNext").focus();
+  }
+  function cerrarTuto() {
+    $("tuto").hidden = true;
+    if (tutoEmpieza) { tutoEmpieza = false; empezar(nombrePendiente || "NeuroFlux AI"); }
+  }
+
+  // ---------- Inicio ----------
+  function empezar(nombre) {
+    Motor.reiniciar(nombre);
+    $("final").hidden = true; $("cierre").hidden = true;
+    $("intro").hidden = true;
+    $("game").hidden = false;
+    nota("");
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  construirAcciones();
+  $("startForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    nombrePendiente = $("nameInput").value.trim() || "NeuroFlux AI";
+    abrirTuto(true);
+  });
+  $("tNext").addEventListener("click", () => { if (tPaso < TUTO.length - 1) { tPaso++; renderTuto(); } else cerrarTuto(); });
+  $("tBack").addEventListener("click", () => { if (tPaso > 0) { tPaso--; renderTuto(); } });
+  $("tSkip").addEventListener("click", cerrarTuto);
+  $("helpBtn").addEventListener("click", () => abrirTuto(false));
+  $("closeBtn").addEventListener("click", cerrarMesUI);
+  $("cSkip").addEventListener("click", saltarAnimacion);
+  $("cNext").addEventListener("click", cerrarCierre);
+  $("again").addEventListener("click", () => empezar(S.nombre));
+  $("closeFinal").addEventListener("click", () => { $("final").hidden = true; });
+})();
+</script>
